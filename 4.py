@@ -1,4 +1,4 @@
-# 指を広げる
+# 遠くでも動く版
 
 import cv2
 import mediapipe as mp
@@ -20,7 +20,7 @@ cTime = 0
 
 # URLが開かれたかを確認するフラグ
 url_opened = False
-url = "https://www.uec.ac.jp"  # 開きたいURLを指定
+url = "https://trpfrog.net"  # 開きたいURLを指定
 
 # 距離計算関数
 def calculate_distance(x1, y1, x2, y2):
@@ -40,21 +40,22 @@ while True:
                 cx, cy = int(lm.x * w), int(lm.y * h)
                 landmarks[id] = (cx, cy)
 
-                # 親指の先端 (id: 4)
-                if id == 4:
-                    cv2.circle(img, (cx, cy), 15, (255, 0, 255), cv2.FILLED)
-                # 小指の先端 (id: 20)
-                if id == 20:
+                # 親指の先端 (id: 4) と人差し指の先端 (id: 8)
+                if id in [4, 8]:
                     cv2.circle(img, (cx, cy), 15, (255, 0, 255), cv2.FILLED)
 
-            # 親指と小指の先端の距離を計算
-            if 4 in landmarks and 20 in landmarks:
+            # 手の大きさ（親指付け根と小指付け根の距離）
+            if 2 in landmarks and 17 in landmarks:
+                hand_size = calculate_distance(landmarks[2][0], landmarks[2][1], landmarks[17][0], landmarks[17][1])
+
+            # 親指と人差し指の先端の距離を手の大きさに対する割合で計算
+            if 4 in landmarks and 8 in landmarks and 'hand_size' in locals():
                 thumb_tip = landmarks[4]
-                pinky_tip = landmarks[20]
-                distance = calculate_distance(thumb_tip[0], thumb_tip[1], pinky_tip[0], pinky_tip[1])
-                
-                # 距離が200ピクセル以上ならURLを開く
-                if distance > 200 and not url_opened:
+                index_tip = landmarks[8]
+                distance = calculate_distance(thumb_tip[0], thumb_tip[1], index_tip[0], index_tip[1])
+
+                # 手の大きさに対する割合で比較（例：0.5以上でURLを開く）
+                if distance / hand_size > 1.5 and not url_opened:
                     webbrowser.open(url)
                     url_opened = True  # URLを1回だけ開くようにする
 
@@ -68,7 +69,7 @@ while True:
 
     # 画像を表示
     cv2.imshow("Image", img)
-    
+
     # 'q' キーで終了
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
