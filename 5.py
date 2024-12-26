@@ -34,7 +34,7 @@ def calculate_distance(x1, y1, x2, y2):
     return math.hypot(x2 - x1, y2 - y1)
 
 while True:
-    if url_opened_time > 0 and time.time() - url_opened_time > 1:
+    if url_opened_time > 0 and time.time() - url_opened_time > 3:
         url_opened = False
         url_opened_time = 0
     success, img = cap.read()
