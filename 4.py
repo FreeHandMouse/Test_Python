@@ -7,7 +7,7 @@ import webbrowser  # URLを開くために必要
 import math        # 距離計算のために必要
 
 # カメラのキャプチャ
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(1)
 
 # Mediapipe Handsモジュールのセットアップ
 mpHands = mp.solutions.hands
@@ -20,13 +20,17 @@ cTime = 0
 
 # URLが開かれたかを確認するフラグ
 url_opened = False
-url = "https://trpfrog.net"  # 開きたいURLを指定
+url_opened_time = 0
+url = "http://www.career.ce.uec.ac.jp/iccd/"  # 開きたいURLを指定
 
 # 距離計算関数
 def calculate_distance(x1, y1, x2, y2):
     return math.hypot(x2 - x1, y2 - y1)
 
 while True:
+    if url_opened_time > 0 and time.time() - url_opened_time > 1:
+        url_opened = False
+        url_opened_time = 0
     success, img = cap.read()
     img = cv2.flip(img, 1)
     imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -58,6 +62,7 @@ while True:
                 if distance / hand_size > 1.5 and not url_opened:
                     webbrowser.open(url)
                     url_opened = True  # URLを1回だけ開くようにする
+                    url_opened_time = time.time()
 
             mpDraw.draw_landmarks(img, handLms, mpHands.HAND_CONNECTIONS)
 
