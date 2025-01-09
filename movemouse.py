@@ -3,12 +3,12 @@
 import cv2
 import mediapipe as mp
 import time
-import webbrowser  # URLを開くために必要
+# import webbrowser  # URLを開くために必要
 import math
 import win32api
 
-import pyautogui
-pyautogui.FAILSAFE = False
+# import pyautogui
+# pyautogui.FAILSAFE = False
 
 # カメラのキャプチャ
 cap = cv2.VideoCapture(1)

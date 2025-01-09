@@ -1,3 +1,4 @@
 opencv-python
-mdeiapipe
-win32api
+mediapipe
+pywin32
+webbrowser
