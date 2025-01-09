@@ -1,0 +1,3 @@
+opencv-python
+mdeiapipe
+win32api
