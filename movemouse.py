@@ -1,36 +1,33 @@
-# 遠くでも動く版
+import ctypes
+import math
+import time
 
 import cv2
 import mediapipe as mp
-import time
-# import webbrowser  # URLを開くために必要
-import math
-import win32api
-import ctypes
 
-ULONG_PTR = ctypes.POINTER(ctypes.c_ulong)
+user32 = ctypes.windll.user32
 
 class MOUSEINPUT(ctypes.Structure):
-    _fields_ = (("dx", ctypes.c_long),
+    _fields_ = [("dx", ctypes.c_long),
                 ("dy", ctypes.c_long),
                 ("mouseData", ctypes.c_ulong),
                 ("dwFlags", ctypes.c_ulong),
                 ("time", ctypes.c_ulong),
-                ("dwExtraInfo", ULONG_PTR))
-
-class INPUT(ctypes.Union):
-    _fields_ = (("ki", ctypes.c_void_p),
-                ("mi", MOUSEINPUT),
-                ("hi", ctypes.c_void_p))
-
-# import pyautogui
-# pyautogui.FAILSAFE = False
+                ("dwExtraInfo", ctypes.POINTER(ctypes.c_ulong))]
+class INPUT(ctypes.Structure):
+    _fields_ = [("type", ctypes.c_ulong), ("mi", MOUSEINPUT)]
+     
+LPINPUT = ctypes.POINTER(INPUT)
+SendInput = user32.SendInput
+SendInput.argtypes = (ctypes.c_uint, LPINPUT, ctypes.c_int)
+SendInput.restype = ctypes.c_uint
 
 # カメラのキャプチャ
 cap = cv2.VideoCapture(1)
 # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-screen_height = win32api.GetSystemMetrics(1)
+
+screen_height = user32.GetSystemMetrics(1)
 window_height = screen_height // 3
 success, img = cap.read()
 h, w, _ = img.shape
@@ -54,9 +51,6 @@ moving = False
 # 距離計算関数
 def calculate_distance(x1, y1, x2, y2):
     return math.hypot(x2 - x1, y2 - y1)
-
-def mouse_move(x, y):
-    win32api.SetCursorPos((x, y))
 
 while True:
     success, img = cap.read()
@@ -93,10 +87,10 @@ while True:
 
             distance_threshold = 0.4
 
-            if distance_0to2 / hand_size < distance_threshold and distance_0to3 / hand_size < distance_threshold:
+            if distance_0to2 / hand_size < distance_threshold and distance_0to3 / hand_size < distance_threshold and not temp_moving:
 
                 # current_mouse_x, current_mouse_y = pyautogui.position()
-                current_mouse_x, current_mouse_y = win32api.GetCursorPos()
+                # current_mouse_x, current_mouse_y = win32api.GetCursorPos()
                 wrist_x, wrist_y = landmarks[0] # 手首の位置
                 positions.append([wrist_x, wrist_y])
                 if len(positions) > max_positions:
@@ -116,24 +110,12 @@ while True:
                     else:
                         avg_motion_distance_x = motion_distance_x
                         avg_motion_distance_y = motion_distance_y
+
+                    mouse_x = int(avg_motion_distance_x * kando)
+                    mouse_y = int(avg_motion_distance_y * kando)
                     
-                    # print(avg_motion_distance_x, motion_distance_x)
-
-                    mouse_x = current_mouse_x + avg_motion_distance_x * kando
-                    mouse_y = current_mouse_y + avg_motion_distance_y * kando
-
-                    mouse_x = int(mouse_x)
-                    mouse_y = int(mouse_y)
-
-                    # print(motion_distance_x, motion_distance_y)
-
-                    # mouse_move_x = current_mouse_x + motion_distance_x*kando
-                    # mouse_move_y = current_mouse_y + motion_distance_y*kando
-
-                    # print(mouse_move_x, mouse_move_y)
-
-                    # pyautogui.moveTo(mouse_move_x, mouse_move_y)
-                    win32api.SetCursorPos((mouse_x, mouse_y))
+                    _mi = MOUSEINPUT(mouse_x, mouse_y, 0, 0x0001, 0, None)
+                    SendInput(1, INPUT(0,_mi), ctypes.sizeof(INPUT))
 
                 moving = True
                 temp_moving = True
