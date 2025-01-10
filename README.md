@@ -3,3 +3,8 @@
 ```
 pip install -r requirements.txt
 ```
+- venv
+```
+python -m venv .venv
+.\.venv\scripts\activate
+```
