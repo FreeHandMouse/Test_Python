@@ -6,12 +6,35 @@ import time
 # import webbrowser  # URLを開くために必要
 import math
 import win32api
+import ctypes
+
+ULONG_PTR = ctypes.POINTER(ctypes.c_ulong)
+
+class MOUSEINPUT(ctypes.Structure):
+    _fields_ = (("dx", ctypes.c_long),
+                ("dy", ctypes.c_long),
+                ("mouseData", ctypes.c_ulong),
+                ("dwFlags", ctypes.c_ulong),
+                ("time", ctypes.c_ulong),
+                ("dwExtraInfo", ULONG_PTR))
+
+class INPUT(ctypes.Union):
+    _fields_ = (("ki", ctypes.c_void_p),
+                ("mi", MOUSEINPUT),
+                ("hi", ctypes.c_void_p))
 
 # import pyautogui
 # pyautogui.FAILSAFE = False
 
 # カメラのキャプチャ
 cap = cv2.VideoCapture(1)
+# cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+# cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+screen_height = win32api.GetSystemMetrics(1)
+window_height = screen_height // 3
+success, img = cap.read()
+h, w, _ = img.shape
+window_width = int(window_height * (w / h))
 
 # Mediapipe Handsモジュールのセットアップ
 mpHands = mp.solutions.hands
@@ -26,12 +49,7 @@ cTime = 0
 positions = []
 max_positions = 10  # 過去の位置を記録する数# 振り動き検出の閾値
 motion_threshold = 150
-
-# URLが開かれたかを確認するフラグ
 moving = False
-url_opened_time = 0
-url1 = "http://www.career.ce.uec.ac.jp/iccd/"  # 開きたいURL1を指定
-url2 = "https://www.uec.ac.jp"  # 開きたいURL2を指定
 
 # 距離計算関数
 def calculate_distance(x1, y1, x2, y2):
@@ -45,12 +63,14 @@ while True:
     img = cv2.flip(img, 1)
     imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     results = hands.process(imgRGB)
+    temp_moving = False # 複数手のうち、少なくとも1つが動いているかどうか
 
     if results.multi_hand_landmarks:
-        for handLms in results.multi_hand_landmarks:
+
+        for handLms in results.multi_hand_landmarks: #1
             landmarks = {}
             # for id, lm in enumerate(handLms.landmark):
-            for id in [0, 2, 4, 8, 12, 16, 17, 20]: # 手首、親指付け根、親指先端、人差し指先端、中指先端、薬指先端、小指付け根、小指先端
+            for id in [0, 2, 4, 8, 12, 16, 17, 20]:
                 lm = handLms.landmark[id]
                 h, w, c = img.shape
                 cx, cy = int(lm.x * w), int(lm.y * h)
@@ -82,6 +102,7 @@ while True:
                 if len(positions) > max_positions:
                     positions.pop(0)
 
+                # print (len(positions))
                 if len(positions) > 1 and moving:
                     previous_wrist_x, previous_wrist_y = positions[-2]
                     motion_distance_x = wrist_x - previous_wrist_x
@@ -115,11 +136,21 @@ while True:
                     win32api.SetCursorPos((mouse_x, mouse_y))
 
                 moving = True
-            else:
-                moving = False
-                positions = []
+                temp_moving = True
+            # else:
+                # moving = False
+                # positions = []
 
             mpDraw.draw_landmarks(img, handLms, mpHands.HAND_CONNECTIONS)
+        
+        if not temp_moving:
+            moving = False
+            positions = []
+        #1  
+    
+    else:
+        # 手を認識していないとき
+        time.sleep(0.000001)
 
     # FPS表示
     cTime = time.time()
@@ -129,6 +160,8 @@ while True:
     cv2.putText(img, f'Moving: {moving}', (10, 140), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
 
     # 画像を表示
+    cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("Image", window_width, window_height)
     cv2.imshow("Image", img)
 
     # 'q' キーで終了
