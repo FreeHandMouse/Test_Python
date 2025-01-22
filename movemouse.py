@@ -119,10 +119,11 @@ while True:
                     
                     # kando = 150
                     kando = 150
+                    avg_num = 3
 
-                    if len(positions) >= 4:
-                        avg_motion_distance_x = sum([positions[i][0] - positions[i-1][0] for i in range(-1, -4, -1)]) / 3 / hand_size
-                        avg_motion_distance_y = sum([positions[i][1] - positions[i-1][1] for i in range(-1, -4, -1)]) / 3 / hand_size
+                    if len(positions) >= avg_num+1:
+                        avg_motion_distance_x = sum([positions[i][0] - positions[i-1][0] for i in range(-1, -(avg_num+1), -1)]) / avg_num / hand_size
+                        avg_motion_distance_y = sum([positions[i][1] - positions[i-1][1] for i in range(-1, -(avg_num+1), -1)]) / avg_num / hand_size
                     else:
                         avg_motion_distance_x = motion_distance_x / hand_size
                         avg_motion_distance_y = motion_distance_y / hand_size
@@ -141,7 +142,7 @@ while True:
                     #     avg_motion_distance_y = pow(avg_motion_distance_y, 2) * sgn(avg_motion_distance_y)
                     #     acceleration_y = 2
 
-                    print(avg_motion_distance_x, avg_motion_distance_y)
+                    # print(avg_motion_distance_x, avg_motion_distance_y)
                     
                     # mouse_x = int(avg_motion_distance_x * kando)
                     # mouse_y = int(avg_motion_distance_y * kando)
@@ -168,6 +169,7 @@ while True:
                     _mi = MOUSEINPUT(0, 0, 0, 0x0002, 0, None)
                     SendInput(1, INPUT(0, _mi), ctypes.sizeof(INPUT))
                     RClicked = True
+                    # print("aaaaa")
             else:
                 if RClicked:
                     _mi = MOUSEINPUT(0, 0, 0, 0x0004, 0, None)
