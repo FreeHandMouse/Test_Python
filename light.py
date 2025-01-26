@@ -6,7 +6,7 @@ import cv2
 import mediapipe as mp
 import serial
 
-sel = serial.Serial('COM6', 9600)
+sel = serial.Serial('COM3', 9600)
 
 user32 = ctypes.windll.user32
 
@@ -100,9 +100,8 @@ while True:
     temp_moving = False # 複数手のうち、少なくとも1つが動いているかどうか
 
     if results.multi_hand_landmarks:
-        time.sleep(0.05)
-        # with open('a.txt', 'w') as f:
-        #     f.write(str(results))
+        with open('a.txt', 'w') as f:
+            f.write(str(results))
         # filename = f'hand_landmarks.json'
         # with open(filename, 'w') as f:
         #     json.dump(results.multi_hand_landmarks, f, ensure_ascii=False, indent=2)
@@ -136,12 +135,12 @@ while True:
 
             # print(int(y0_angle), int(y1_angle), int(y2_angle), int(y3_angle), int(y4_angle))
 
-            if y1_angle > open_ste_th_2 and y2_angle > open_ste_th_2 and y3_angle > open_ste_th_2 and y4_angle > open_ste_th_2:
-                open_state = 2
-            elif y1_angle > open_ste_th_1 and y2_angle > open_ste_th_1 and y3_angle > open_ste_th_1 and y4_angle > open_ste_th_1:
+            if y1_angle > open_ste_th_1 and y2_angle > open_ste_th_1 and y3_angle > open_ste_th_1 and y4_angle > open_ste_th_1:
                 open_state = 1
+            elif y1_angle > open_ste_th_2 and y2_angle > open_ste_th_2 and y3_angle > open_ste_th_2 and y4_angle > open_ste_th_2:
+                open_state = 2
 
-            # print(open_state)
+            print(open_state)
 
             if open_state >= 1 and not temp_moving:
               
@@ -160,7 +159,7 @@ while True:
                     motion_distance_z = (wrist_z - previous_wrist_z) / hand_size
                     
                     move_th = 0.1
-                    move_th_world = 0.0001
+                    move_th_world = 0.00001
                     
                     motion_distance_x = motion_distance_x if abs(motion_distance_x) > move_th else 0
                     motion_distance_y = motion_distance_y if abs(motion_distance_y) > move_th else 0
@@ -169,14 +168,11 @@ while True:
                     move_x = sgn(motion_distance_x)
                     move_y = sgn(motion_distance_y)
                     move_z = sgn(motion_distance_z)
-                    arm = 0
-
-                    if open_state == 2:
-                        arm = 1
                     
-                    sel.write(f'{move_x},{move_z},{move_y},{arm}\n'.encode())
-                    print(f'{motion_distance_x},{motion_distance_z},{motion_distance_y},{arm}\n')
-                    # print(f'{move_x},{move_z},{move_y},{arm}\n')
+                    sel.write(f'{move_x},{move_z},{move_y},0\n'.encode())
+                    time.sleep(1)
+                    print(f'{motion_distance_x},{motion_distance_z},{motion_distance_y},0\n')
+                    print(f'{move_x},{move_z},{move_y},0\n')
 
                 moving = True
                 temp_moving = True
