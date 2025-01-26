@@ -6,7 +6,7 @@ import cv2
 import mediapipe as mp
 import serial
 
-# sel = serial.Serial('COM3', 9600)
+sel = serial.Serial('COM3', 9600)
 
 user32 = ctypes.windll.user32
 
@@ -106,7 +106,7 @@ while True:
         # with open(filename, 'w') as f:
         #     json.dump(results.multi_hand_landmarks, f, ensure_ascii=False, indent=2)
 
-        for handLms in results.multi_hand_landmarks: #1
+        for index, handLms in enumerate(results.multi_hand_landmarks): #1
             landmarks = {}
             # for id, lm in enumerate(handLms.landmark):
             for id in range(21):
@@ -125,6 +125,7 @@ while True:
 
             # 指の開閉状態を判定
             open_ste_th_1 = 30
+            open_ste_th_2 = 80
             open_state = 0 # 0: 解放, 1: 動作 2: 閉じる
             y0_angle = yubi_angle_3d(landmarks,17,5,4)  # 親指
             y1_angle = yubi_angle_3d(landmarks,0,5,8)  # 人差し指
@@ -132,61 +133,46 @@ while True:
             y3_angle = yubi_angle_3d(landmarks,0,13,16)  # 薬指
             y4_angle = yubi_angle_3d(landmarks,0,17,20)  # 小指
 
-            print(int(y0_angle), int(y1_angle), int(y2_angle), int(y3_angle), int(y4_angle))
+            # print(int(y0_angle), int(y1_angle), int(y2_angle), int(y3_angle), int(y4_angle))
 
             if y1_angle > open_ste_th_1 and y2_angle > open_ste_th_1 and y3_angle > open_ste_th_1 and y4_angle > open_ste_th_1:
                 open_state = 1
+            elif y1_angle > open_ste_th_2 and y2_angle > open_ste_th_2 and y3_angle > open_ste_th_2 and y4_angle > open_ste_th_2:
+                open_state = 2
 
-            # 親指の先端と人差し指の先端の距離
-            y0_tip = landmarks[4]
-            y1_tip = landmarks[8]
-            y2_tip = landmarks[12]
-            y3_tip = landmarks[16]
-            y4_tip = landmarks[20]
-            distance_0to2 = calculate_distance(y0_tip[0], y0_tip[1], y2_tip[0], y2_tip[1])
-            distance_0to3 = calculate_distance(y0_tip[0], y0_tip[1], y3_tip[0], y3_tip[1])
-            distance_1to2 = calculate_distance(y1_tip[0], y1_tip[1], y2_tip[0], y2_tip[1])
-            distance_3to4 = calculate_distance(y3_tip[0], y3_tip[1], y4_tip[0], y4_tip[1])
-
-            distance_threshold = 0.35
-
-            if distance_0to2 / hand_size < distance_threshold and distance_0to3 / hand_size < distance_threshold:
-                if open_state == 1:
-                    open_state = 2
             print(open_state)
 
-            if distance_0to2 / hand_size < distance_threshold and distance_0to3 / hand_size < distance_threshold and not temp_moving:
+            if open_state >= 1 and not temp_moving:
               
-                # current_mouse_x, current_mouse_y = pyautogui.position()
-                # current_mouse_x, current_mouse_y = win32api.GetCursorPos()
-                # wrist_x, wrist_y = landmarks[0] # 手首の位置
-                wrist_x, wrist_y, wrist_z = landmarks[4] # 親指の先端の位置
-                positions.append([wrist_x, wrist_y])
+                wrist_x, wrist_y, wrist_z = landmarks[0] # 手首の位置
+                wrist_z = results.multi_hand_world_landmarks[index].landmark[0].z # zをworldで上書き
+                # wrist_x, wrist_y, wrist_z = landmarks[4] # 親指の先端の位置
+                positions.append([wrist_x, wrist_y, wrist_z])
                 if len(positions) > max_positions:
                     positions.pop(0)
 
                 # print (len(positions))
                 if len(positions) > 1 and moving:
-                    previous_wrist_x, previous_wrist_y = positions[-2]
-                    motion_distance_x = wrist_x - previous_wrist_x
-                    motion_distance_y = wrist_y - previous_wrist_y
+                    previous_wrist_x, previous_wrist_y, previous_wrist_z = positions[-2]
+                    motion_distance_x = (wrist_x - previous_wrist_x) / hand_size
+                    motion_distance_y = (wrist_y - previous_wrist_y) / hand_size
+                    motion_distance_z = (wrist_z - previous_wrist_z) / hand_size
                     
-                    # kando = 150
-                    kando = 150
-                    avg_num = 3
-
-                    if len(positions) >= avg_num+1:
-                        avg_motion_distance_x = sum([positions[i][0] - positions[i-1][0] for i in range(-1, -(avg_num+1), -1)]) / avg_num / hand_size
-                        avg_motion_distance_y = sum([positions[i][1] - positions[i-1][1] for i in range(-1, -(avg_num+1), -1)]) / avg_num / hand_size
-                    else:
-                        avg_motion_distance_x = motion_distance_x / hand_size
-                        avg_motion_distance_y = motion_distance_y / hand_size
+                    move_th = 0.1
+                    move_th_world = 0.00001
                     
-                    acceleration_x = 1
-                    acceleration_y = 1
+                    motion_distance_x = motion_distance_x if abs(motion_distance_x) > move_th else 0
+                    motion_distance_y = motion_distance_y if abs(motion_distance_y) > move_th else 0
+                    motion_distance_z = motion_distance_z if abs(motion_distance_z) > move_th_world else 0
 
-                    mouse_x = int(avg_motion_distance_x * kando * acceleration_x)
-                    mouse_y = int(avg_motion_distance_y * kando * acceleration_x)
+                    move_x = sgn(motion_distance_x)
+                    move_y = sgn(motion_distance_y)
+                    move_z = sgn(motion_distance_z)
+                    
+                    sel.write(f'{move_x},{move_z},{move_y},0\n'.encode())
+                    time.sleep(1)
+                    print(f'{motion_distance_x},{motion_distance_z},{motion_distance_y},0\n')
+                    print(f'{move_x},{move_z},{move_y},0\n')
 
                 moving = True
                 temp_moving = True
