@@ -6,7 +6,7 @@ import cv2
 import mediapipe as mp
 import serial
 
-sel = serial.Serial('COM6', 9600)
+sel = serial.Serial('COM3', 9600)
 
 user32 = ctypes.windll.user32
 
@@ -31,7 +31,7 @@ cap = cv2.VideoCapture(1)
 # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 screen_height = user32.GetSystemMetrics(1)
-window_height = screen_height // 3
+window_height = int(screen_height // 2)
 success, img = cap.read()
 h, w, _ = img.shape
 window_width = int(window_height * (w / h))
@@ -92,7 +92,12 @@ def sgn(x):
     else:
         return 0
 
+pre_state = [[0,0,0,1],[0,0,0,1]]
+p_time = time.time()
+
 while True:
+    time.sleep(0.1)
+    plane_state = []
     success, img = cap.read()
     img = cv2.flip(img, 1)
     imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -100,7 +105,6 @@ while True:
     temp_moving = False # 複数手のうち、少なくとも1つが動いているかどうか
 
     if results.multi_hand_landmarks:
-        time.sleep(0.05)
         # with open('a.txt', 'w') as f:
         #     f.write(str(results))
         # filename = f'hand_landmarks.json'
@@ -159,23 +163,23 @@ while True:
                     motion_distance_y = (wrist_y - previous_wrist_y) / hand_size
                     motion_distance_z = (wrist_z - previous_wrist_z) / hand_size
                     
-                    move_th = 0.1
+                    move_th_1 = 0.1
+                    move_th_2 = 0.08
                     move_th_world = 0.0001
                     
-                    motion_distance_x = motion_distance_x if abs(motion_distance_x) > move_th else 0
-                    motion_distance_y = motion_distance_y if abs(motion_distance_y) > move_th else 0
+                    motion_distance_x = motion_distance_x if abs(motion_distance_x) > move_th_1 else 0
+                    motion_distance_y = motion_distance_y if abs(motion_distance_y) > move_th_2 else 0
                     motion_distance_z = motion_distance_z if abs(motion_distance_z) > move_th_world else 0
 
                     move_x = sgn(motion_distance_x)
-                    move_y = sgn(motion_distance_y)
+                    move_y = sgn(motion_distance_y) *-1
                     move_z = sgn(motion_distance_z)
-                    arm = 0
+                    arm = 1
 
                     if open_state == 2:
-                        arm = 1
-                    
-                    sel.write(f'{move_x},{move_z},{move_y},{arm}\n'.encode())
-                    print(f'{motion_distance_x},{motion_distance_z},{motion_distance_y},{arm}\n')
+                        arm = 2
+                    move_z = 0
+                    plane_state = [move_x, move_z, move_y, arm]
                     # print(f'{move_x},{move_z},{move_y},{arm}\n')
 
                 moving = True
@@ -192,12 +196,37 @@ while True:
         # 手を認識していないとき
         time.sleep(0.000001)
 
-    # FPS表示
     cTime = time.time()
     fps = 1 / (cTime - pTime)
     pTime = cTime
-    cv2.putText(img, f'FPS: {int(fps)}', (10, 70), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
-    cv2.putText(img, f'Moving: {moving}', (10, 140), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
+    output = [0,0,0,1]
+    # if plane_state != 0 and pre_state != plane_state:
+    #     p_time = cTime
+    #     pre_state = plane_state
+    # elif plane_state == 0 and cTime - p_time < 0.5:
+    #     output = pre_state
+    if plane_state == []:
+        plane_state = [0,0,0,1]
+    
+
+    output[0] = plane_state[0] == pre_state[-1][0] and plane_state[0] or pre_state[-1][0]
+    output[1] = plane_state[1] == pre_state[-1][1] and plane_state[1] or pre_state[-1][1]
+    output[2] = plane_state[2] == pre_state[-1][2] and plane_state[2] or pre_state[-1][2]
+    output[3] = plane_state[3] == pre_state[-1][3] and plane_state[3] or pre_state[-1][3]
+    # output[3] = plane_state[3] if plane_state[3] == pre_state[0][3] else pre_state[0][3]
+    
+    pre_state.append(plane_state)
+    pre_state.pop(0)
+
+    sel.write(f'{output[0]},{output[1]},{output[2]},{output[3]}\n'.encode())
+    print(pre_state, plane_state, output)
+
+    # FPS表示
+    # cTime = time.time()
+    # fps = 1 / (cTime - pTime)
+    # pTime = cTime
+    # cv2.putText(img, f'FPS: {int(fps)}', (10, 70), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
+    cv2.putText(img, f'Moving: {moving}', (10, 60), cv2.FONT_HERSHEY_PLAIN, 2, (255, 0, 255), 3)
 
     # 画像を表示
     cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
