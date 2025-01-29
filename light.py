@@ -31,7 +31,7 @@ cap = cv2.VideoCapture(1)
 # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 screen_height = user32.GetSystemMetrics(1)
-window_height = screen_height // 3
+window_height = screen_height // 2
 success, img = cap.read()
 h, w, _ = img.shape
 window_width = int(window_height * (w / h))
@@ -92,7 +92,10 @@ def sgn(x):
     else:
         return 0
 
+pre_state = 0
+p_time = time.time()
 while True:
+    plane_state = 0
     success, img = cap.read()
     img = cv2.flip(img, 1)
     imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -100,8 +103,9 @@ while True:
     temp_moving = False # 複数手のうち、少なくとも1つが動いているかどうか
 
     if results.multi_hand_landmarks:
-        with open('a.txt', 'w') as f:
-            f.write(str(results))
+        # time.sleep(0.05)
+        # with open('a.txt', 'w') as f:
+        #     f.write(str(results))
         # filename = f'hand_landmarks.json'
         # with open(filename, 'w') as f:
         #     json.dump(results.multi_hand_landmarks, f, ensure_ascii=False, indent=2)
@@ -124,8 +128,7 @@ while True:
             hand_size = calculate_distance(landmarks[2][0], landmarks[2][1], landmarks[17][0], landmarks[17][1])
 
             # 指の開閉状態を判定
-            open_ste_th_1 = 30
-            open_ste_th_2 = 80
+            open_ste_th_1 = 80
             open_state = 0 # 0: 解放, 1: 動作 2: 閉じる
             y0_angle = yubi_angle_3d(landmarks,17,5,4)  # 親指
             y1_angle = yubi_angle_3d(landmarks,0,5,8)  # 人差し指
@@ -135,17 +138,15 @@ while True:
 
             # print(int(y0_angle), int(y1_angle), int(y2_angle), int(y3_angle), int(y4_angle))
 
-            if y1_angle > open_ste_th_1 and y2_angle > open_ste_th_1 and y3_angle > open_ste_th_1 and y4_angle > open_ste_th_1:
+            if y1_angle < open_ste_th_1 and y2_angle > open_ste_th_1 and y3_angle > open_ste_th_1 and y4_angle > open_ste_th_1:
                 open_state = 1
-            elif y1_angle > open_ste_th_2 and y2_angle > open_ste_th_2 and y3_angle > open_ste_th_2 and y4_angle > open_ste_th_2:
-                open_state = 2
 
-            print(open_state)
+            # print(open_state)
 
             if open_state >= 1 and not temp_moving:
               
-                wrist_x, wrist_y, wrist_z = landmarks[0] # 手首の位置
-                wrist_z = results.multi_hand_world_landmarks[index].landmark[0].z # zをworldで上書き
+                wrist_x, wrist_y, wrist_z = landmarks[8]
+                # wrist_z = results.multi_hand_world_landmarks[index].landmark[0].z # zをworldで上書き
                 # wrist_x, wrist_y, wrist_z = landmarks[4] # 親指の先端の位置
                 positions.append([wrist_x, wrist_y, wrist_z])
                 if len(positions) > max_positions:
@@ -155,24 +156,22 @@ while True:
                 if len(positions) > 1 and moving:
                     previous_wrist_x, previous_wrist_y, previous_wrist_z = positions[-2]
                     motion_distance_x = (wrist_x - previous_wrist_x) / hand_size
-                    motion_distance_y = (wrist_y - previous_wrist_y) / hand_size
-                    motion_distance_z = (wrist_z - previous_wrist_z) / hand_size
+                    # motion_distance_y = (wrist_y - previous_wrist_y) / hand_size
+                    # motion_distance_z = (wrist_z - previous_wrist_z) / hand_size
                     
-                    move_th = 0.1
-                    move_th_world = 0.00001
+                    move_th = 0.3
+                    move_th_world = 0.0001
                     
                     motion_distance_x = motion_distance_x if abs(motion_distance_x) > move_th else 0
-                    motion_distance_y = motion_distance_y if abs(motion_distance_y) > move_th else 0
-                    motion_distance_z = motion_distance_z if abs(motion_distance_z) > move_th_world else 0
+                    # motion_distance_y = motion_distance_y if abs(motion_distance_y) > move_th else 0
+                    # motion_distance_z = motion_distance_z if abs(motion_distance_z) > move_th_world else 0
 
                     move_x = sgn(motion_distance_x)
-                    move_y = sgn(motion_distance_y)
-                    move_z = sgn(motion_distance_z)
+                    # move_y = sgn(motion_distance_y)
+                    # move_z = sgn(motion_distance_z)
+                    plane_state = move_x
                     
-                    sel.write(f'{move_x},{move_z},{move_y},0\n'.encode())
-                    time.sleep(1)
-                    print(f'{motion_distance_x},{motion_distance_z},{motion_distance_y},0\n')
-                    print(f'{move_x},{move_z},{move_y},0\n')
+                    # print(f'{move_x},{move_z},{move_y},{arm}\n')
 
                 moving = True
                 temp_moving = True
@@ -187,13 +186,23 @@ while True:
     else:
         # 手を認識していないとき
         time.sleep(0.000001)
-
-    # FPS表示
+    
     cTime = time.time()
     fps = 1 / (cTime - pTime)
     pTime = cTime
-    cv2.putText(img, f'FPS: {int(fps)}', (10, 70), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
-    cv2.putText(img, f'Moving: {moving}', (10, 140), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
+    output = plane_state
+    if plane_state != 0 and pre_state != plane_state:
+        p_time = cTime
+        pre_state = plane_state
+    elif plane_state == 0 and cTime - p_time < 0.5:
+        output = pre_state
+
+    sel.write(f'{output}\n'.encode())
+    print(f'{output}')
+
+    # FPS表示
+    # cv2.putText(img, f'FPS: {int(fps)}', (10, 70), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
+    # cv2.putText(img, f'Moving: {moving}', (10, 140), cv2.FONT_HERSHEY_PLAIN, 3, (255, 0, 255), 3)
 
     # 画像を表示
     cv2.namedWindow("Image", cv2.WINDOW_NORMAL)
