@@ -1,12 +1,13 @@
 import ctypes
-import math
 import time
 
 import cv2
 import mediapipe as mp
 
-user32 = ctypes.windll.user32
+import calculate
 
+# マウスカーソルの移動設定
+user32 = ctypes.windll.user32
 class MOUSEINPUT(ctypes.Structure):
     _fields_ = [("dx", ctypes.c_long),
                 ("dy", ctypes.c_long),
@@ -24,8 +25,6 @@ SendInput.restype = ctypes.c_uint
 
 # カメラのキャプチャ
 cap = cv2.VideoCapture(1)
-# cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-# cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 screen_height = user32.GetSystemMetrics(1)
 window_height = screen_height // 3
@@ -44,23 +43,11 @@ cTime = 0
 
 # 手の位置を記録するためのリスト
 positions = []
-max_positions = 10  # 過去の位置を記録する数# 振り動き検出の閾値
+max_positions = 10  # 過去の位置を記録する数
 motion_threshold = 150
 moving = False
 RClicked = False
 LClicked = False
-
-# 距離計算関数
-def calculate_distance(x1, y1, x2, y2):
-    return math.hypot(x2 - x1, y2 - y1)
-
-def sgn(x):
-    if x > 0:
-        return 1
-    elif x < 0:
-        return -1
-    else:
-        return 0
 
 while True:
     success, img = cap.read()
@@ -86,7 +73,7 @@ while True:
 
 
             # 手の大きさ（親指付け根と小指付け根の距離）
-            hand_size = calculate_distance(landmarks[2][0], landmarks[2][1], landmarks[17][0], landmarks[17][1])
+            hand_size = calculate.distance(landmarks[2][0], landmarks[2][1], landmarks[17][0], landmarks[17][1])
 
             # 親指の先端と人差し指の先端の距離
             y0_tip = landmarks[4]
@@ -94,18 +81,15 @@ while True:
             y2_tip = landmarks[12]
             y3_tip = landmarks[16]
             y4_tip = landmarks[20]
-            distance_0to2 = calculate_distance(y0_tip[0], y0_tip[1], y2_tip[0], y2_tip[1])
-            distance_0to3 = calculate_distance(y0_tip[0], y0_tip[1], y3_tip[0], y3_tip[1])
-            distance_1to2 = calculate_distance(y1_tip[0], y1_tip[1], y2_tip[0], y2_tip[1])
-            distance_3to4 = calculate_distance(y3_tip[0], y3_tip[1], y4_tip[0], y4_tip[1])
+            distance_0to2 = calculate.distance(y0_tip[0], y0_tip[1], y2_tip[0], y2_tip[1])
+            distance_0to3 = calculate.distance(y0_tip[0], y0_tip[1], y3_tip[0], y3_tip[1])
+            distance_1to2 = calculate.distance(y1_tip[0], y1_tip[1], y2_tip[0], y2_tip[1])
+            distance_3to4 = calculate.distance(y3_tip[0], y3_tip[1], y4_tip[0], y4_tip[1])
 
             distance_threshold = 0.35
 
             if distance_0to2 / hand_size < distance_threshold and distance_0to3 / hand_size < distance_threshold and not temp_moving:
               
-                # current_mouse_x, current_mouse_y = pyautogui.position()
-                # current_mouse_x, current_mouse_y = win32api.GetCursorPos()
-                # wrist_x, wrist_y = landmarks[0] # 手首の位置
                 wrist_x, wrist_y = landmarks[4] # 親指の先端の位置
                 positions.append([wrist_x, wrist_y])
                 if len(positions) > max_positions:
@@ -131,25 +115,6 @@ while True:
                     acceleration_x = 1
                     acceleration_y = 1
 
-                    # if abs(avg_motion_distance_x) < 0.005:
-                    #     avg_motion_distance_x = 0
-                    # elif abs(avg_motion_distance_x) < 0.1:
-                    #     avg_motion_distance_x = pow(avg_motion_distance_x, 2) * sgn(avg_motion_distance_x)
-                    #     acceleration_x = 2
-                    # if abs(avg_motion_distance_y) < 0.005:
-                    #     avg_motion_distance_y = 0
-                    # elif abs(avg_motion_distance_y) < 0.1:
-                    #     avg_motion_distance_y = pow(avg_motion_distance_y, 2) * sgn(avg_motion_distance_y)
-                    #     acceleration_y = 2
-
-                    # print(avg_motion_distance_x, avg_motion_distance_y)
-                    
-                    # mouse_x = int(avg_motion_distance_x * kando)
-                    # mouse_y = int(avg_motion_distance_y * kando)
-
-                    # mouse_x = int(min(pow(avg_motion_distance_x, 2) * kando, 1000)) * sgn(avg_motion_distance_x)
-                    # mouse_y = int(min(pow(avg_motion_distance_y, 2) * kando, 1000)) * sgn(avg_motion_distance_y)
-
                     mouse_x = int(avg_motion_distance_x * kando * acceleration_x)
                     mouse_y = int(avg_motion_distance_y * kando * acceleration_x)
                     
@@ -159,17 +124,11 @@ while True:
                 moving = True
                 temp_moving = True
 
-            # if distance_1to2 / hand_size < distance_threshold and distance_3to4 / hand_size < distance_threshold and moving:
-            #     # if not moving:
-            #     _mi = MOUSEINPUT(0, 0, 0, 0x0800, 0, None)  # 0x0800 is the flag for mouse wheel
-            #     SendInput(1, INPUT(0, _mi), ctypes.sizeof(INPUT))
-
             if distance_1to2 / hand_size < distance_threshold and moving:
                 if not RClicked:
                     _mi = MOUSEINPUT(0, 0, 0, 0x0002, 0, None)
                     SendInput(1, INPUT(0, _mi), ctypes.sizeof(INPUT))
                     RClicked = True
-                    # print("aaaaa")
             else:
                 if RClicked:
                     _mi = MOUSEINPUT(0, 0, 0, 0x0004, 0, None)

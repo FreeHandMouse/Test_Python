@@ -1,10 +1,11 @@
 import ctypes
-import math
 import time
 
 import cv2
 import mediapipe as mp
 import serial
+
+import calculate
 
 sel = serial.Serial('COM3', 9600)
 
@@ -53,45 +54,6 @@ moving = False
 RClicked = False
 LClicked = False
 
-def calculate_angle_3d(vector1, vector2):
-    # 内積を計算
-    dot_product = (
-        vector1[0] * vector2[0]
-        + vector1[1] * vector2[1]
-        + vector1[2] * vector2[2]
-    )
-    # ベクトルの大きさを計算
-    magnitude1 = math.sqrt(vector1[0] ** 2 + vector1[1] ** 2 + vector1[2] ** 2)
-    magnitude2 = math.sqrt(vector2[0] ** 2 + vector2[1] ** 2 + vector2[2] ** 2)
-    # 角度を計算（ラジアン単位）
-    if magnitude1 == 0 or magnitude2 == 0:
-        return 180
-    angle_rad = math.acos(dot_product / (magnitude1 * magnitude2))
-    # ラジアンを度に変換
-    angle_deg = math.degrees(angle_rad)
-    return angle_deg
-
-def yubi_angle_3d(landmarks, posnum1, posnum2, posnum3):
-    pos1 = landmarks[posnum1]
-    pos2 = landmarks[posnum2]
-    pos3 = landmarks[posnum3]
-    atob = (pos2[0] - pos1[0], pos2[1] - pos1[1], pos2[2] - pos1[2])
-    btoc = (pos3[0] - pos2[0], pos3[1] - pos2[1], pos3[2] - pos2[2])
-    angle = calculate_angle_3d(atob, btoc)
-    return angle
-
-# 距離計算関数
-def calculate_distance(x1, y1, x2, y2):
-    return math.hypot(x2 - x1, y2 - y1)
-
-def sgn(x):
-    if x > 0:
-        return 1
-    elif x < 0:
-        return -1
-    else:
-        return 0
-
 pre_state = [[0,0,0,1],[0,0,0,1]]
 p_time = time.time()
 
@@ -126,17 +88,17 @@ while True:
 
 
             # 手の大きさ（親指付け根と小指付け根の距離）
-            hand_size = calculate_distance(landmarks[2][0], landmarks[2][1], landmarks[17][0], landmarks[17][1])
+            hand_size = calculate.distance(landmarks[2][0], landmarks[2][1], landmarks[17][0], landmarks[17][1])
 
             # 指の開閉状態を判定
             open_ste_th_1 = 30
             open_ste_th_2 = 80
             open_state = 0 # 0: 解放, 1: 動作 2: 閉じる
-            y0_angle = yubi_angle_3d(landmarks,17,5,4)  # 親指
-            y1_angle = yubi_angle_3d(landmarks,0,5,8)  # 人差し指
-            y2_angle = yubi_angle_3d(landmarks,0,9,12)  # 中指
-            y3_angle = yubi_angle_3d(landmarks,0,13,16)  # 薬指
-            y4_angle = yubi_angle_3d(landmarks,0,17,20)  # 小指
+            y0_angle = calculate.yubi_angle_3d(landmarks,17,5,4)  # 親指
+            y1_angle = calculate.yubi_angle_3d(landmarks,0,5,8)  # 人差し指
+            y2_angle = calculate.yubi_angle_3d(landmarks,0,9,12)  # 中指
+            y3_angle = calculate.yubi_angle_3d(landmarks,0,13,16)  # 薬指
+            y4_angle = calculate.yubi_angle_3d(landmarks,0,17,20)  # 小指
 
             # print(int(y0_angle), int(y1_angle), int(y2_angle), int(y3_angle), int(y4_angle))
 
@@ -171,9 +133,9 @@ while True:
                     motion_distance_y = motion_distance_y if abs(motion_distance_y) > move_th_2 else 0
                     motion_distance_z = motion_distance_z if abs(motion_distance_z) > move_th_world else 0
 
-                    move_x = sgn(motion_distance_x)
-                    move_y = sgn(motion_distance_y) *-1
-                    move_z = sgn(motion_distance_z)
+                    move_x = calculate.sgn(motion_distance_x)
+                    move_y = calculate.sgn(motion_distance_y) *-1
+                    move_z = calculate.sgn(motion_distance_z)
                     arm = 1
 
                     if open_state == 2:
